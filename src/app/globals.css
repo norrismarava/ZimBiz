@@ -74,7 +74,35 @@ body {
     background: var(--border);
     border-radius: 3px;
   }
+  .zb-pulse {
+    animation: zb-pulse 1.6s ease-in-out infinite;
+  }
+  .zb-orbit {
+    animation: zb-orbit 3.2s linear infinite;
+    transform-origin: center;
+  }
 }
+
+@keyframes zb-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.9); opacity: 0.8; }
+}
+
+@keyframes zb-orbit {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes zb-dots {
+  0%, 20% { opacity: 0.25; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-3px); }
+  100% { opacity: 0.25; transform: translateY(0); }
+}
+
+.zb-dot {
+  animation: zb-dots 1.2s ease-in-out infinite;
+}
+.zb-dot:nth-child(2) { animation-delay: 0.15s; }
+.zb-dot:nth-child(3) { animation-delay: 0.3s; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

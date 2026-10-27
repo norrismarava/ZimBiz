@@ -1,6 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
-  <rect width="48" height="48" rx="10" fill="#047857"/>
-  <path d="M24 10L34 14V24C34 30 29.5 35 24 37C18.5 35 14 30 14 24V14L24 10Z" fill="white" fill-opacity="0.15" stroke="white" stroke-width="2" stroke-linejoin="round"/>
-  <path d="M19 23.5L22.5 27L29 20.5" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="24" cy="24" r="14" stroke="#D4A017" stroke-width="1.5" stroke-opacity="0.4" stroke-dasharray="3 3"/>
+  <defs>
+    <linearGradient id="zb-bg" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#059669"/>
+      <stop offset="1" stop-color="#064E3B"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="12" fill="url(#zb-bg)"/>
+  <path d="M15.5 15.5H32.5L15.5 32.5H32.5" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="15.5" cy="15.5" r="3.25" fill="white"/>
+  <circle cx="32.5" cy="15.5" r="3.25" fill="white"/>
+  <circle cx="15.5" cy="32.5" r="3.25" fill="white"/>
+  <circle cx="32.5" cy="32.5" r="4" fill="#D4A017"/>
 </svg>
