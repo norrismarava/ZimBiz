@@ -1,10 +1,11 @@
 import { PrismaClient } from "@/generated/prisma";
 import { PrismaNeonHttp } from "@prisma/adapter-neon";
+import { PrismaPg } from "@prisma/adapter-pg";
 
-const adapter = new PrismaNeonHttp(process.env.DATABASE_URL!, {
-  arrayMode: false,
-  fullResults: false,
-});
+const url = process.env.DATABASE_URL!;
+const adapter = url.includes("neon.tech")
+  ? new PrismaNeonHttp(url, { arrayMode: false, fullResults: false })
+  : new PrismaPg({ connectionString: url });
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;

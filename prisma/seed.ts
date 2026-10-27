@@ -1,13 +1,17 @@
 import "dotenv/config";
 import { PrismaClient, ProfileType, VerificationStatus, BusinessStatus, FreshnessLabel } from "../src/generated/prisma";
 import { PrismaNeon } from "@prisma/adapter-neon";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { neonConfig } from "@neondatabase/serverless";
 import ws from "ws";
 import bcrypt from "bcryptjs";
 
 neonConfig.webSocketConstructor = ws;
 
-const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL });
+const dbUrl = process.env.DATABASE_URL!;
+const adapter = dbUrl.includes("neon.tech")
+  ? new PrismaNeon({ connectionString: dbUrl })
+  : new PrismaPg({ connectionString: dbUrl });
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
