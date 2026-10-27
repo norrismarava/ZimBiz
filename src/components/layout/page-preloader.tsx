@@ -104,6 +104,22 @@ export function PagePreloader() {
     };
   }, []);
 
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      setProgress((p) => {
+        const target = done ? 100 : 90;
+        const next = p + (target - p) * 0.06;
+        return done ? Math.min(100, next + 1.5) : next;
+      });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [done]);
+
   if (hidden) return null;
 
   return (
@@ -114,12 +130,33 @@ export function PagePreloader() {
       onTransitionEnd={() => setHidden(true)}
     >
       <canvas ref={canvasRef} className="absolute inset-0 block" />
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/logo.svg"
-        alt=""
-        className="zb-pulse absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-2xl shadow-2xl"
-      />
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 px-6">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/logo.svg"
+          alt=""
+          className="zb-reveal h-20 w-20 rounded-2xl shadow-2xl sm:h-24 sm:w-24"
+        />
+        <div className="zb-reveal zb-delay-1 text-center">
+          <p className="text-3xl font-black italic tracking-tight text-white sm:text-4xl">
+            Zim<span className="text-[#34D399]">Biz</span>
+          </p>
+          <p className="mt-1 text-[11px] font-bold tracking-[0.3em] text-[#D4A017] sm:text-xs">
+            DISCOVER · VERIFY · CONNECT
+          </p>
+        </div>
+        <div className="zb-reveal zb-delay-2 w-48 sm:w-56">
+          <div className="h-1 w-full overflow-hidden rounded-full bg-white/15">
+            <div
+              className="h-full rounded-full bg-[#D4A017] transition-[width] duration-150 ease-out"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <p className="mt-2 text-center text-[10px] font-medium tracking-widest text-white/50">
+            {Math.round(progress)}%
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

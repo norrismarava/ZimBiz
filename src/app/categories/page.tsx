@@ -1,21 +1,15 @@
 import Link from "next/link";
-import { Sun, HardHat, Wrench, PartyPopper, ArrowRight } from "lucide-react";
+import { Sun, ArrowRight } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 export const dynamic = "force-dynamic";
 
-const categoryIcons: Record<string, typeof Sun> = {
-  "solar-electrical": Sun,
-  "construction": HardHat,
-  "automotive": Wrench,
-  "events": PartyPopper,
-};
-
 export default async function CategoriesPage() {
   const categories = await prisma.category.findMany({
-    orderBy: { name: "asc" },
+    where: { isActive: true },
+    orderBy: { sortOrder: "asc" },
     include: {
       _count: {
         select: {
@@ -36,37 +30,48 @@ export default async function CategoriesPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {categories.map((cat) => {
-          const Icon = categoryIcons[cat.slug] || Sun;
-          return (
-            <Link key={cat.id} href={`/search?category=${cat.slug}`}>
-              <Card className="hover:border-[#059669]/30 hover:shadow-md transition-all cursor-pointer h-full">
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#047857]/10 text-[#047857] flex-shrink-0">
-                      <Icon className="h-6 w-6" aria-hidden="true" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h2 className="font-semibold text-[#111827]">{cat.name}</h2>
-                      {cat.description && (
-                        <p className="text-sm text-[#64748B] mt-1 line-clamp-2">{cat.description}</p>
-                      )}
-                      <div className="flex items-center gap-2 mt-3">
-                        <Badge variant="neutral">
-                          {cat._count.businesses} businesses
-                        </Badge>
-                        <Badge variant="neutral">
-                          {cat._count.services} services
-                        </Badge>
-                      </div>
-                    </div>
-                    <ArrowRight className="h-5 w-5 text-[#DDE7E2] flex-shrink-0" aria-hidden="true" />
+        {categories.map((cat) => (
+          <Link key={cat.id} href={`/search?category=${cat.slug}`}>
+            <Card className="overflow-hidden hover:border-[#059669]/30 hover:shadow-lg transition-all cursor-pointer h-full group">
+              <div className="relative h-40 w-full overflow-hidden bg-[#F1F5F4]">
+                {cat.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={cat.imageUrl}
+                    alt={cat.name}
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-[#047857]">
+                    <Sun className="h-10 w-10" aria-hidden="true" />
                   </div>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                <h2 className="absolute bottom-3 left-4 font-semibold text-white drop-shadow">
+                  {cat.name}
+                </h2>
+              </div>
+              <CardContent className="p-5">
+                {cat.description && (
+                  <p className="text-sm text-[#64748B] line-clamp-2">{cat.description}</p>
+                )}
+                <div className="flex items-center justify-between mt-3">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="neutral">
+                      {cat._count.businesses} businesses
+                    </Badge>
+                    {cat._count.services > 0 && (
+                      <Badge variant="neutral">
+                        {cat._count.services} services
+                      </Badge>
+                    )}
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-[#059669] flex-shrink-0 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
       </div>
 
       {categories.length === 0 && (

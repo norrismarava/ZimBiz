@@ -103,6 +103,17 @@ html.is-loading body {
   pointer-events: none;
 }
 
+.zb-reveal {
+  animation: zb-reveal 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.zb-delay-1 { animation-delay: 0.12s; }
+.zb-delay-2 { animation-delay: 0.24s; }
+
+@keyframes zb-reveal {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 @keyframes zb-pulse {
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(0.9); opacity: 0.8; }

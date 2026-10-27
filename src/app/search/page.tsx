@@ -203,9 +203,9 @@ export default async function SearchPage({
                   <Card className="hover:shadow-md hover:border-[#059669]/30 transition-all cursor-pointer">
                     <CardContent className="p-5">
                       <div className="flex items-start gap-4">
-                        {biz.logoUrl ? (
+                        {biz.logoUrl ?? biz.coverImageUrl ? (
                           <img
-                            src={biz.logoUrl}
+                            src={(biz.logoUrl ?? biz.coverImageUrl) as string}
                             alt={`${biz.name} logo`}
                             className="h-14 w-14 rounded-lg object-cover flex-shrink-0"
                           />

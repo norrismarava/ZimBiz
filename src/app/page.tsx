@@ -5,10 +5,6 @@ import {
   FileText,
   Star,
   MapPin,
-  Sun,
-  HardHat,
-  Wrench,
-  PartyPopper,
   ArrowRight,
   CheckCircle2,
   Phone,
@@ -20,33 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
-const pilotCategories = [
-  {
-    name: "Solar & Electrical",
-    icon: Sun,
-    href: "/search?category=solar-electrical",
-    description: "Installers, backup power, generators, electrical repairs",
-  },
-  {
-    name: "Construction & Boreholes",
-    icon: HardHat,
-    href: "/search?category=construction",
-    description: "Builders, borehole drillers, property maintenance",
-  },
-  {
-    name: "Automotive",
-    icon: Wrench,
-    href: "/search?category=automotive",
-    description: "Workshops, mobile mechanics, spare parts",
-  },
-  {
-    name: "Events & Catering",
-    icon: PartyPopper,
-    href: "/search?category=events",
-    description: "Caterers, photographers, equipment hire",
-  },
-];
+import { prisma } from "@/lib/prisma";
 
 const trustFeatures = [
   {
@@ -93,7 +63,20 @@ const howItWorks = [
   },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const popularCategories = await prisma.category.findMany({
+    where: { isActive: true, parentId: null },
+    orderBy: { sortOrder: "asc" },
+    take: 8,
+    include: {
+      _count: {
+        select: {
+          businesses: { where: { status: "PUBLISHED", deletedAt: null } },
+        },
+      },
+    },
+  });
+
   return (
     <div className="flex flex-col">
       {/* Hero Section */}
@@ -211,22 +194,29 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {pilotCategories.map((cat) => {
-              const Icon = cat.icon;
-              return (
-                <Link key={cat.name} href={cat.href}>
-                  <Card className="h-full hover:shadow-md hover:border-[#059669]/30 transition-all cursor-pointer group">
-                    <CardContent className="p-5">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#047857]/10 text-[#047857] mb-3 group-hover:bg-[#047857] group-hover:text-white transition-colors">
-                        <Icon className="h-5 w-5" aria-hidden="true" />
-                      </div>
-                      <h3 className="font-semibold text-[#111827] mb-1">{cat.name}</h3>
-                      <p className="text-sm text-[#64748B]">{cat.description}</p>
-                    </CardContent>
-                  </Card>
-                </Link>
-              );
-            })}
+            {popularCategories.map((cat) => (
+              <Link key={cat.id} href={`/search?category=${cat.slug}`}>
+                <Card className="h-full overflow-hidden hover:shadow-md hover:border-[#059669]/30 transition-all cursor-pointer group">
+                  <div className="relative h-32 w-full overflow-hidden bg-[#F1F5F4]">
+                    {cat.imageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={cat.imageUrl}
+                        alt={cat.name}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                    )}
+                  </div>
+                  <CardContent className="p-5">
+                    <h3 className="font-semibold text-[#111827] mb-1">{cat.name}</h3>
+                    <p className="text-sm text-[#64748B] line-clamp-2">{cat.description}</p>
+                    <p className="mt-3 text-xs font-medium text-[#059669]">
+                      {cat._count.businesses} businesses
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
           </div>
         </div>
       </section>

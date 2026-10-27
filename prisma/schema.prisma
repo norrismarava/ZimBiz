@@ -211,6 +211,7 @@ model Category {
   slug            String       @unique
   description     String?
   icon            String?
+  imageUrl        String?
   parentId        String?      @db.Uuid
   parent          Category?    @relation("CategoryHierarchy", fields: [parentId], references: [id])
   children        Category[]   @relation("CategoryHierarchy")
