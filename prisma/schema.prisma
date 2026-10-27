@@ -1,0 +1,1724 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ──────────────────────────────────────────────────────────────
+// AUTHENTICATION & USERS
+// ──────────────────────────────────────────────────────────────
+
+model User {
+  id                String        @id @default(uuid()) @db.Uuid
+  email             String?       @unique
+  emailVerified     DateTime?
+  phone             String?       @unique
+  phoneVerified     DateTime?
+  passwordHash      String?
+  name              String?
+  image             String?
+  status            UserStatus    @default(ACTIVE)
+  failedLoginCount  Int           @default(0)
+  lockedUntil       DateTime?
+  lastLoginAt       DateTime?
+  lastLoginIp       String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  deletedAt         DateTime?
+
+  profile           UserProfile?
+  sessions          Session[]
+  userRoles         UserRole[]
+  ownedBusinesses   Business[]    @relation("BusinessOwner")
+  businessMembers   BusinessMember[]
+  providerProfile   ProviderProfile?
+  verificationCases VerificationCase[] @relation("VerificationOfficer")
+  conversations     ConversationParticipant[]
+  messages          Message[]
+  customerRequests  CustomerRequest[]
+  quotes            Quote[]       @relation("QuoteProvider")
+  reviews           Review[]      @relation("ReviewAuthor")
+  reviewResponses   ReviewResponse[]
+  leads             Lead[]        @relation("LeadAssignedTo")
+  leadNotes         LeadNote[]
+  reports           Report[]      @relation("ReportReporter")
+  moderationActions ModerationAction[]
+  notifications     Notification[]
+  notificationPrefs NotificationPreference?
+  favourites        Favourite[]
+  follows           Follow[]
+  savedSearches     SavedSearch[]
+  auditLogs         AuditLog[]    @relation("AuditActor")
+  consentRecords    ConsentRecord[]
+  supportTickets    SupportTicket[] @relation("SupportTicketUser")
+  dataExportRequests DataExportRequest[]
+  accountDeletionRequests AccountDeletionRequest[]
+  payments          Payment[]
+
+  @@index([status])
+  @@index([deletedAt])
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+  PENDING_DELETION
+  DELETED
+}
+
+model UserProfile {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @unique @db.Uuid
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName String?
+  bio         String?
+  avatarUrl   String?
+  preferredLanguage String @default("en")
+  marketingConsent Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Role {
+  id          String       @id @default(uuid()) @db.Uuid
+  name        String       @unique
+  description String?
+  isSystem    Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  userRoles   UserRole[]
+  permissions Permission[]
+}
+
+model Permission {
+  id          String       @id @default(uuid()) @db.Uuid
+  name        String       @unique
+  description String?
+  roles       Role[]
+}
+
+model UserRole {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  roleId    String   @db.Uuid
+  scope      String?  // e.g. businessId for scoped roles
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId, scope])
+  @@index([userId])
+  @@index([roleId])
+}
+
+model Session {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token        String   @unique
+  expiresAt    DateTime
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ──────────────────────────────────────────────────────────────
+// GEOGRAPHY: COUNTRY, REGION, LOCATION, ADDRESS
+// ──────────────────────────────────────────────────────────────
+
+model Country {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique @db.VarChar(3)
+  name      String
+  currency  String   @default("USD")
+  phoneCode String?
+  timezone  String?
+  regions   Region[]
+  locations Location[]
+  createdAt DateTime @default(now())
+}
+
+model Region {
+  id        String   @id @default(uuid()) @db.Uuid
+  countryId String   @db.Uuid
+  country   Country  @relation(fields: [countryId], references: [id])
+  name      String
+  type      String?  // province, district, municipality
+  parentId  String?  @db.Uuid
+  parent    Region?  @relation("RegionHierarchy", fields: [parentId], references: [id])
+  children  Region[] @relation("RegionHierarchy")
+  locations Location[]
+  createdAt DateTime @default(now())
+
+  @@index([countryId])
+  @@index([parentId])
+}
+
+model Location {
+  id          String   @id @default(uuid()) @db.Uuid
+  countryId   String   @db.Uuid
+  country     Country  @relation(fields: [countryId], references: [id])
+  regionId    String?  @db.Uuid
+  region      Region?  @relation(fields: [regionId], references: [id])
+  name        String
+  type        String?  // city, town, suburb, ward, growth_point, rural, landmark
+  latitude    Float?
+  longitude   Float?
+  parentId    String?  @db.Uuid
+  parent      Location? @relation("LocationHierarchy", fields: [parentId], references: [id])
+  children    Location[] @relation("LocationHierarchy")
+  aliases     String?  // comma-separated aliases
+  createdAt   DateTime @default(now())
+
+  addresses        Address[]
+  serviceAreas     ServiceArea[]
+  customerRequests CustomerRequest[]
+
+  @@index([countryId])
+  @@index([regionId])
+  @@index([parentId])
+}
+
+model Address {
+  id           String    @id @default(uuid()) @db.Uuid
+  line1        String?
+  line2        String?
+  locationId   String?   @db.Uuid
+  location     Location? @relation(fields: [locationId], references: [id])
+  latitude     Float?
+  longitude    Float?
+  directions   String?
+  landmark     String?
+  createdAt    DateTime  @default(now())
+  businesses   Business[]
+  branches     BusinessBranch[]
+  providerProfiles ProviderProfile[]
+}
+
+// ──────────────────────────────────────────────────────────────
+// CATEGORIES & DYNAMIC FIELDS
+// ──────────────────────────────────────────────────────────────
+
+model Category {
+  id              String       @id @default(uuid()) @db.Uuid
+  name            String       @unique
+  slug            String       @unique
+  description     String?
+  icon            String?
+  parentId        String?      @db.Uuid
+  parent          Category?    @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children        Category[]   @relation("CategoryHierarchy")
+  sortOrder       Int          @default(0)
+  isActive        Boolean      @default(true)
+  fieldDefinitions CategoryFieldDefinition[]
+  services        Service[]
+  products        Product[]
+  promotions      Promotion[]
+  verificationReqs VerificationRequirement[]
+  customerRequests CustomerRequest[]
+  businesses       Business[]     @relation("BusinessPrimaryCategory")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([parentId])
+  @@index([slug])
+  @@index([isActive])
+}
+
+model CategoryFieldDefinition {
+  id          String   @id @default(uuid()) @db.Uuid
+  categoryId  String   @db.Uuid
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  fieldKey    String
+  fieldLabel  String
+  fieldType   FieldType
+  required    Boolean  @default(false)
+  options     Json?    // for select/multiselect
+  validation  Json?    // min, max, pattern, etc.
+  sortOrder   Int      @default(0)
+  appliesTo   FieldAppliesTo @default(REQUEST)
+  createdAt   DateTime @default(now())
+
+  @@unique([categoryId, fieldKey, appliesTo])
+  @@index([categoryId])
+}
+
+enum FieldType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  SELECT
+  MULTISELECT
+  DATE
+  BOOLEAN
+  FILE
+  RADIO
+}
+
+enum FieldAppliesTo {
+  REQUEST
+  SERVICE
+  PRODUCT
+  BUSINESS
+}
+
+// ──────────────────────────────────────────────────────────────
+// BUSINESSES & PROVIDERS
+// ──────────────────────────────────────────────────────────────
+
+model Business {
+  id              String        @id @default(uuid()) @db.Uuid
+  ownerId         String        @db.Uuid
+  owner           User          @relation("BusinessOwner", fields: [ownerId], references: [id])
+  name            String
+  slug            String        @unique
+  logoUrl         String?
+  coverImageUrl   String?
+  shortDescription String?
+  about           String?
+  profileType     ProfileType   @default(FORMAL)
+  yearEstablished Int?
+  websiteUrl      String?
+  status          BusinessStatus @default(DRAFT)
+  isClaimed       Boolean       @default(false)
+  primaryCategoryId String?     @db.Uuid
+  primaryCategory   Category?   @relation("BusinessPrimaryCategory", fields: [primaryCategoryId], references: [id])
+  addressId       String?       @db.Uuid
+  address         Address?      @relation(fields: [addressId], references: [id])
+  phone           String?
+  email           String?
+  whatsappNumber  String?
+  averageRating   Float?        // computed
+  reviewCount     Int           @default(0)
+  interactionCount Int          @default(0)
+  responseRate    Float?        // computed
+  typicalResponseHours Int?
+  profileFreshness FreshnessLabel @default(UNKNOWN)
+  verificationStatus VerificationStatus @default(NOT_SUBMITTED)
+  profileViews    Int          @default(0)
+  lastReconfirmedAt DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  deletedAt       DateTime?
+
+  members         BusinessMember[]
+  branches        BusinessBranch[]
+  serviceAreas    ServiceArea[]
+  contacts        BusinessContact[]
+  hours           BusinessHours[]
+  services        Service[]
+  products        Product[]
+  promotions      Promotion[]
+  portfolioItems  PortfolioItem[]
+  verificationCases VerificationCase[]
+  trustPassportItems TrustPassportItem[]
+  profileConfirmations ProfileConfirmation[]
+  customerRequests CustomerRequest[] @relation("RequestBusiness")
+  quotes          Quote[]       @relation("QuoteBusiness")
+  leads           Lead[]
+  reviews         Review[]      @relation("ReviewBusiness")
+  conversations   Conversation[]
+  reports         Report[]      @relation("ReportBusiness")
+  claims          BusinessClaim[]
+  campaigns       Campaign[]
+  subscription    Subscription?
+  favourites      Favourite[]
+  follows         Follow[]
+  duplicateCandidates DuplicateCandidate[] @relation("DuplicatePrimary")
+  duplicateCandidatesOf DuplicateCandidate[] @relation("DuplicateSecondary")
+
+  @@index([ownerId])
+  @@index([slug])
+  @@index([status])
+  @@index([primaryCategoryId])
+  @@index([deletedAt])
+  @@index([profileFreshness])
+}
+
+enum ProfileType {
+  FORMAL
+  INFORMAL
+}
+
+enum BusinessStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  REJECTED
+  PAUSED
+  ARCHIVED
+  REMOVED
+}
+
+enum FreshnessLabel {
+  RECONFIRMED_THIS_WEEK
+  RECONFIRMED_THIS_MONTH
+  UPDATED_QUARTER_AGO
+  MAY_BE_OUTDATED
+  TEMPORARILY_UNREACHABLE
+  CLOSED
+  UNKNOWN
+}
+
+model BusinessClaim {
+  id          String   @id @default(uuid()) @db.Uuid
+  businessId  String   @db.Uuid
+  business    Business @relation(fields: [businessId], references: [id])
+  userId      String   @db.Uuid
+  status      ClaimStatus @default(PENDING)
+  evidence    Json?
+  reviewedBy  String?  @db.Uuid
+  reviewedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([status])
+}
+
+enum ClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+model BusinessMember {
+  id          String       @id @default(uuid()) @db.Uuid
+  businessId  String       @db.Uuid
+  business    Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  userId      String       @db.Uuid
+  user        User         @relation(fields: [userId], references: [id])
+  role        BusinessRole @default(MEMBER)
+  invitedAt   DateTime?
+  acceptedAt  DateTime?
+  createdAt   DateTime     @default(now())
+
+  @@unique([businessId, userId])
+  @@index([businessId])
+  @@index([userId])
+}
+
+enum BusinessRole {
+  OWNER
+  ADMINISTRATOR
+  BRANCH_MANAGER
+  SALES_REPRESENTATIVE
+  MARKETING_MANAGER
+  CUSTOMER_SUPPORT
+  VERIFICATION_LIAISON
+  ANALYST
+  BILLING_MANAGER
+  MEMBER
+}
+
+model BusinessBranch {
+  id          String   @id @default(uuid()) @db.Uuid
+  businessId  String   @db.Uuid
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name        String
+  addressId   String?  @db.Uuid
+  address     Address? @relation(fields: [addressId], references: [id])
+  phone       String?
+  email       String?
+  managerName String?
+  createdAt   DateTime @default(now())
+
+  @@index([businessId])
+}
+
+model ServiceArea {
+  id          String   @id @default(uuid()) @db.Uuid
+  businessId  String?  @db.Uuid
+  business    Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  providerId  String?  @db.Uuid
+  provider    ProviderProfile? @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  locationId  String?  @db.Uuid
+  location    Location? @relation(fields: [locationId], references: [id])
+  radiusKm    Int?
+  isNationwide Boolean @default(false)
+  isOnline    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([businessId])
+  @@index([providerId])
+  @@index([locationId])
+}
+
+model BusinessContact {
+  id          String   @id @default(uuid()) @db.Uuid
+  businessId  String   @db.Uuid
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  type        String   // phone, email, whatsapp, website, social
+  value       String
+  label       String?
+  isPublic    Boolean  @default(true)
+  confirmedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([businessId])
+}
+
+model BusinessHours {
+  id          String   @id @default(uuid()) @db.Uuid
+  businessId  String   @db.Uuid
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  dayOfWeek   Int      // 0=Sunday ... 6=Saturday
+  openTime    String?  // "08:00"
+  closeTime   String?  // "17:00"
+  isClosed    Boolean  @default(false)
+  isHoliday   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@unique([businessId, dayOfWeek])
+  @@index([businessId])
+}
+
+model ProviderProfile {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @unique @db.Uuid
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName String
+  slug        String   @unique
+  bio         String?
+  avatarUrl   String?
+  coverImageUrl String?
+  profileType ProfileType @default(INFORMAL)
+  status      BusinessStatus @default(DRAFT)
+  skills      String[] @default([])
+  experience  String?
+  pricingGuidance String?
+  addressId   String?  @db.Uuid
+  address     Address? @relation(fields: [addressId], references: [id])
+  phone       String?
+  whatsappNumber String?
+  averageRating Float?
+  reviewCount Int      @default(0)
+  interactionCount Int @default(0)
+  profileFreshness FreshnessLabel @default(UNKNOWN)
+  lastReconfirmedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  serviceAreas ServiceArea[]
+  portfolioItems PortfolioItem[]
+  verificationCases VerificationCase[]
+  trustPassportItems TrustPassportItem[]
+  profileConfirmations ProfileConfirmation[]
+  services    Service[]
+  customerRequests CustomerRequest[] @relation("RequestProvider")
+  quotes      Quote[] @relation("QuoteProviderProfile")
+  leads       Lead[]
+  reviews     Review[] @relation("ReviewProvider")
+  conversations Conversation[]
+
+  @@index([slug])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+// ──────────────────────────────────────────────────────────────
+// SERVICES, PRODUCTS, PROMOTIONS, PORTFOLIO
+// ──────────────────────────────────────────────────────────────
+
+model Service {
+  id            String   @id @default(uuid()) @db.Uuid
+  businessId    String?  @db.Uuid
+  business      Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  providerId    String?  @db.Uuid
+  provider      ProviderProfile? @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  categoryId    String?  @db.Uuid
+  category      Category? @relation(fields: [categoryId], references: [id])
+  title         String
+  description   String?
+  pricingModel  String?  // fixed, hourly, per_project, contact_for_price
+  startingPrice Decimal? @db.Decimal(12, 2)
+  currency      String   @default("USD")
+  isRemote      Boolean  @default(false)
+  isOnsite      Boolean  @default(true)
+  availability  String?
+  turnaround    String?
+  status        ContentStatus @default(DRAFT)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  portfolioItems PortfolioItem[]
+  customerRequests CustomerRequest[]
+
+  @@index([businessId])
+  @@index([providerId])
+  @@index([categoryId])
+  @@index([status])
+}
+
+model Product {
+  id            String   @id @default(uuid()) @db.Uuid
+  businessId    String   @db.Uuid
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  categoryId    String?  @db.Uuid
+  category      Category? @relation(fields: [categoryId], references: [id])
+  title         String
+  description   String?
+  condition     String?  // new, used, refurbished
+  price         Decimal? @db.Decimal(12, 2)
+  currency      String   @default("USD")
+  isNegotiable  Boolean  @default(false)
+  stockStatus   String?  @default("in_stock")
+  images        String[] @default([])
+  variants      Json?
+  deliveryInfo  String?
+  warranty      String?
+  status        ContentStatus @default(DRAFT)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([categoryId])
+  @@index([status])
+}
+
+model Promotion {
+  id            String   @id @default(uuid()) @db.Uuid
+  businessId    String   @db.Uuid
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  categoryId    String?  @db.Uuid
+  category      Category? @relation(fields: [categoryId], references: [id])
+  title         String
+  description   String?
+  type          PromotionType @default(DISCOUNT)
+  startDate     DateTime?
+  endDate       DateTime?
+  terms         String?
+  status        ContentStatus @default(DRAFT)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([status])
+}
+
+enum PromotionType {
+  DISCOUNT
+  BUNDLE
+  SEASONAL
+  NEW_PRODUCT
+  FEATURED_SERVICE
+}
+
+enum ContentStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  REJECTED
+  PAUSED
+  EXPIRED
+  ARCHIVED
+  REMOVED
+}
+
+model PortfolioItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  businessId  String?  @db.Uuid
+  business    Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  providerId  String?  @db.Uuid
+  provider    ProviderProfile? @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  serviceId   String?  @db.Uuid
+  service     Service?  @relation(fields: [serviceId], references: [id])
+  title       String
+  description String?
+  imageUrl    String?
+  projectDate DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([businessId])
+  @@index([providerId])
+}
+
+// ──────────────────────────────────────────────────────────────
+// TRUST PASSPORT & VERIFICATION
+// ──────────────────────────────────────────────────────────────
+
+model VerificationType {
+  id              String   @id @default(uuid()) @db.Uuid
+  name            String   @unique
+  slug            String   @unique
+  description     String?
+  publicExplanation String?
+  isFormal        Boolean  @default(true)
+  defaultExpiryMonths Int?
+  evidence        VerificationEvidence[]
+  requirements    VerificationRequirement[]
+  cases           VerificationCase[]
+  createdAt       DateTime @default(now())
+}
+
+model VerificationRequirement {
+  id                String             @id @default(uuid()) @db.Uuid
+  categoryId        String?            @db.Uuid
+  category          Category?          @relation(fields: [categoryId], references: [id])
+  verificationTypeId String            @db.Uuid
+  verificationType  VerificationType   @relation(fields: [verificationTypeId], references: [id])
+  isRequired        Boolean            @default(true)
+  sortOrder         Int                @default(0)
+  createdAt         DateTime           @default(now())
+
+  @@unique([categoryId, verificationTypeId])
+  @@index([categoryId])
+}
+
+model VerificationCase {
+  id              String   @id @default(uuid()) @db.Uuid
+  businessId      String?  @db.Uuid
+  business        Business? @relation(fields: [businessId], references: [id])
+  providerId      String?  @db.Uuid
+  provider        ProviderProfile? @relation(fields: [providerId], references: [id])
+  verificationTypeId String @db.Uuid
+  verificationType VerificationType @relation(fields: [verificationTypeId], references: [id])
+  status          VerificationStatus @default(NOT_SUBMITTED)
+  submittedAt     DateTime?
+  reviewedAt      DateTime?
+  reviewerId      String?  @db.Uuid
+  reviewer        User?    @relation("VerificationOfficer", fields: [reviewerId], references: [id])
+  decision        VerificationDecision?
+  reasonCode      String?
+  internalNotes   String?
+  publicExplanation String?
+  issueDate       DateTime?
+  expiryDate      DateTime?
+  reverificationDate DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  evidence        VerificationEvidence[]
+  trustPassportItems TrustPassportItem[]
+  auditLogs       AuditLog[]
+
+  @@index([businessId])
+  @@index([providerId])
+  @@index([status])
+  @@index([reviewerId])
+}
+
+enum VerificationStatus {
+  NOT_SUBMITTED
+  PENDING
+  MORE_INFO_REQUIRED
+  VERIFIED
+  REJECTED
+  EXPIRED
+  REVOKED
+  UNABLE_TO_VERIFY
+}
+
+model VerificationDecision {
+  id                    String             @id @default(uuid()) @db.Uuid
+  caseId                String             @unique @db.Uuid
+  case                  VerificationCase   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  decision              VerificationStatus
+  reasonCode            String?
+  internalNotes         String?
+  publicExplanation     String?
+  reviewerId            String             @db.Uuid
+  decidedAt             DateTime           @default(now())
+  revokedAt             DateTime?
+  revocationReason      String?
+
+  @@index([caseId])
+}
+
+model VerificationEvidence {
+  id                String             @id @default(uuid()) @db.Uuid
+  caseId            String             @db.Uuid
+  case              VerificationCase   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  verificationTypeId String            @db.Uuid
+  verificationType  VerificationType   @relation(fields: [verificationTypeId], references: [id])
+  evidenceType      String             // document, photo, reference, check
+  evidenceSource    String?
+  verificationMethod String?
+  issuingAuthority  String?
+  documentRef       String?            // private storage key
+  issueDate         DateTime?
+  expiryDate        DateTime?
+  submittedAt       DateTime           @default(now())
+  createdAt         DateTime           @default(now())
+
+  @@index([caseId])
+  @@index([verificationTypeId])
+}
+
+model TrustPassportItem {
+  id                String             @id @default(uuid()) @db.Uuid
+  businessId        String?            @db.Uuid
+  business          Business?          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  providerId        String?            @db.Uuid
+  provider          ProviderProfile?   @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  caseId            String?            @db.Uuid
+  case              VerificationCase?  @relation(fields: [caseId], references: [id])
+  name              String
+  status            VerificationStatus
+  publicExplanation String?
+  verificationMethod String?
+  dateChecked       DateTime?
+  expiryDate        DateTime?
+  lastUpdated       DateTime?
+  publicLimitation  String?
+  sortOrder         Int                @default(0)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([businessId])
+  @@index([providerId])
+  @@index([status])
+}
+
+// ──────────────────────────────────────────────────────────────
+// PROFILE FRESHNESS & DUPLICATES
+// ──────────────────────────────────────────────────────────────
+
+model ProfileConfirmation {
+  id          String   @id @default(uuid()) @db.Uuid
+  businessId  String?  @db.Uuid
+  business    Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  providerId  String?  @db.Uuid
+  provider    ProviderProfile? @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  field       String   // phone, email, location, hours, services, prices
+  confirmedAt DateTime @default(now())
+  confirmedBy String?  // user, staff, system
+  method      String?  // in_app, email, sms, whatsapp, staff
+  createdAt   DateTime @default(now())
+
+  @@index([businessId])
+  @@index([providerId])
+  @@index([field])
+}
+
+model DuplicateCandidate {
+  id            String   @id @default(uuid()) @db.Uuid
+  primaryId     String   @db.Uuid
+  primary       Business @relation("DuplicatePrimary", fields: [primaryId], references: [id])
+  secondaryId   String   @db.Uuid
+  secondary     Business @relation("DuplicateSecondary", fields: [secondaryId], references: [id])
+  similarity    Float
+  matchReasons  String[]
+  status        String   @default("PENDING_REVIEW") // PENDING_REVIEW, MERGED, DISMISSED
+  reviewedBy    String?  @db.Uuid
+  reviewedAt    DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([primaryId])
+  @@index([secondaryId])
+  @@index([status])
+}
+
+// ──────────────────────────────────────────────────────────────
+// CUSTOMER REQUESTS & MATCHING
+// ──────────────────────────────────────────────────────────────
+
+model CustomerRequest {
+  id              String   @id @default(uuid()) @db.Uuid
+  customerId      String   @db.Uuid
+  customer        User     @relation(fields: [customerId], references: [id])
+  categoryId      String?  @db.Uuid
+  category        Category? @relation(fields: [categoryId], references: [id])
+  serviceId       String?  @db.Uuid
+  service         Service?  @relation(fields: [serviceId], references: [id])
+  businessId      String?  @db.Uuid  // direct request to specific business
+  business        Business? @relation("RequestBusiness", fields: [businessId], references: [id])
+  providerId      String?  @db.Uuid
+  provider        ProviderProfile? @relation("RequestProvider", fields: [providerId], references: [id])
+  title           String
+  description     String?
+  locationId      String?  @db.Uuid
+  location        Location? @relation(fields: [locationId], references: [id])
+  preferredDate   DateTime?
+  urgency         String?  // low, normal, high, urgent
+  budgetMin       Decimal? @db.Decimal(12, 2)
+  budgetMax       Decimal? @db.Decimal(12, 2)
+  currency        String   @default("USD")
+  quantity        String?
+  specifications  String?
+  siteConditions  String?
+  preferredContact String?
+  status          RequestStatus @default(OPEN)
+  isPrivate       Boolean  @default(true)
+  expiresAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  answers         RequestAnswer[]
+  matches         RequestMatch[]
+  quotes          Quote[]
+  workRecords     WorkRecord[]
+  conversations   Conversation[]
+  leads           Lead[]
+
+  @@index([customerId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([locationId])
+}
+
+enum RequestStatus {
+  OPEN
+  MATCHED
+  QUOTE_RECEIVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+model RequestAnswer {
+  id          String          @id @default(uuid()) @db.Uuid
+  requestId   String          @db.Uuid
+  request     CustomerRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fieldKey    String
+  fieldValue  String
+  createdAt   DateTime @default(now())
+
+  @@index([requestId])
+}
+
+model RequestMatch {
+  id          String          @id @default(uuid()) @db.Uuid
+  requestId   String          @db.Uuid
+  request     CustomerRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  businessId  String?         @db.Uuid
+  providerId  String?         @db.Uuid
+  matchScore  Float
+  matchReasons String[]
+  status      String   @default("PENDING") // PENDING, ACCEPTED, DECLINED, EXPIRED
+  notifiedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([requestId])
+  @@index([businessId])
+  @@index([providerId])
+}
+
+// ──────────────────────────────────────────────────────────────
+// QUOTATIONS
+// ──────────────────────────────────────────────────────────────
+
+model Quote {
+  id              String   @id @default(uuid()) @db.Uuid
+  quoteNumber     String   @unique
+  requestId       String?  @db.Uuid
+  request         CustomerRequest? @relation(fields: [requestId], references: [id])
+  businessId      String?  @db.Uuid
+  business        Business? @relation("QuoteBusiness", fields: [businessId], references: [id])
+  providerId      String?  @db.Uuid
+  provider        ProviderProfile? @relation("QuoteProviderProfile", fields: [providerId], references: [id])
+  providerUserId  String   @db.Uuid
+  providerUser    User     @relation("QuoteProvider", fields: [providerUserId], references: [id])
+  customerId      String?  @db.Uuid
+  scopeOfWork     String
+  totalAmount     Decimal  @db.Decimal(14, 2)
+  currency        String   @default("USD")
+  taxAmount       Decimal? @db.Decimal(14, 2)
+  discountAmount  Decimal? @db.Decimal(14, 2)
+  validityPeriod  Int?     // days
+  startDate       DateTime?
+  estimatedCompletion DateTime?
+  warranty        String?
+  paymentSchedule String?
+  exclusions      String?
+  assumptions     String?
+  notes           String?
+  terms           String?
+  status          QuoteStatus @default(DRAFT)
+  viewedAt        DateTime?
+  sentAt          DateTime?
+  acceptedAt      DateTime?
+  declinedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  lineItems       QuoteLine[]
+  revisions       QuoteRevision[]
+  workRecords     WorkRecord[]
+  conversations   Conversation[]
+
+  @@index([requestId])
+  @@index([businessId])
+  @@index([providerId])
+  @@index([providerUserId])
+  @@index([status])
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  VIEWED
+  CLARIFICATION_REQUESTED
+  REVISED
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  WITHDRAWN
+  CONVERTED_TO_WORK
+}
+
+model QuoteLine {
+  id          String   @id @default(uuid()) @db.Uuid
+  quoteId     String   @db.Uuid
+  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Decimal  @db.Decimal(10, 2)
+  unit        String?
+  unitPrice   Decimal  @db.Decimal(12, 2)
+  lineTotal   Decimal  @db.Decimal(14, 2)
+  isLabour    Boolean  @default(false)
+  isMaterial  Boolean  @default(false)
+  isDelivery  Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([quoteId])
+}
+
+model QuoteRevision {
+  id          String   @id @default(uuid()) @db.Uuid
+  quoteId     String   @db.Uuid
+  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  revisionNumber Int
+  changes     String?
+  totalAmount Decimal  @db.Decimal(14, 2)
+  createdAt   DateTime @default(now())
+
+  @@index([quoteId])
+}
+
+// ──────────────────────────────────────────────────────────────
+// WORK RECORDS & OUTCOMES
+// ──────────────────────────────────────────────────────────────
+
+model WorkRecord {
+  id              String   @id @default(uuid()) @db.Uuid
+  requestId       String?  @db.Uuid
+  request         CustomerRequest? @relation(fields: [requestId], references: [id])
+  quoteId         String?  @db.Uuid
+  quote           Quote?   @relation(fields: [quoteId], references: [id])
+  businessId      String?  @db.Uuid
+  providerId      String?  @db.Uuid
+  customerId      String   @db.Uuid
+  status          WorkStatus @default(AGREED)
+  startDate       DateTime?
+  endDate         DateTime?
+  outcomeReason   String?
+  customerConfirmedAt DateTime?
+  providerConfirmedAt DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  milestones      WorkMilestone[]
+  outcomeConfirmations OutcomeConfirmation[]
+  reviews         Review[]
+
+  @@index([requestId])
+  @@index([quoteId])
+  @@index([status])
+}
+
+enum WorkStatus {
+  AGREED
+  SCHEDULED
+  IN_PROGRESS
+  AWAITING_CUSTOMER
+  COMPLETED
+  CANCELLED_BY_CUSTOMER
+  CANCELLED_BY_PROVIDER
+  DISPUTED
+  RESOLVED
+}
+
+model WorkMilestone {
+  id          String   @id @default(uuid()) @db.Uuid
+  workRecordId String  @db.Uuid
+  workRecord  WorkRecord @relation(fields: [workRecordId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  dueDate     DateTime?
+  completedAt DateTime?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([workRecordId])
+}
+
+model OutcomeConfirmation {
+  id            String   @id @default(uuid()) @db.Uuid
+  workRecordId  String   @db.Uuid
+  workRecord    WorkRecord @relation(fields: [workRecordId], references: [id], onDelete: Cascade)
+  confirmedBy   String   // customer, provider
+  userId        String   @db.Uuid
+  confirmedAt   DateTime @default(now())
+  notes         String?
+
+  @@index([workRecordId])
+}
+
+// ──────────────────────────────────────────────────────────────
+// CONVERSATIONS & MESSAGING
+// ──────────────────────────────────────────────────────────────
+
+model Conversation {
+  id          String   @id @default(uuid()) @db.Uuid
+  requestId    String?  @db.Uuid
+  request     CustomerRequest? @relation(fields: [requestId], references: [id])
+  quoteId     String?  @db.Uuid
+  quote       Quote?   @relation(fields: [quoteId], references: [id])
+  businessId  String?  @db.Uuid
+  business    Business? @relation(fields: [businessId], references: [id])
+  providerId  String?  @db.Uuid
+  provider    ProviderProfile? @relation(fields: [providerId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([requestId])
+  @@index([quoteId])
+  @@index([businessId])
+}
+
+model ConversationParticipant {
+  id              String       @id @default(uuid()) @db.Uuid
+  conversationId  String       @db.Uuid
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId          String       @db.Uuid
+  user            User         @relation(fields: [userId], references: [id])
+  lastReadAt      DateTime?
+  isMuted         Boolean      @default(false)
+  isBlocked       Boolean      @default(false)
+  joinedAt        DateTime     @default(now())
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id              String       @id @default(uuid()) @db.Uuid
+  conversationId  String       @db.Uuid
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId        String       @db.Uuid
+  sender          User         @relation(fields: [senderId], references: [id])
+  body            String
+  isSystemMessage Boolean      @default(false)
+  isRead          Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+
+  attachments     MessageAttachment[]
+
+  @@index([conversationId])
+  @@index([senderId])
+}
+
+model MessageAttachment {
+  id          String   @id @default(uuid()) @db.Uuid
+  messageId   String   @db.Uuid
+  message     Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  fileUrl     String
+  fileName    String
+  fileType    String?
+  fileSize    Int?
+  createdAt   DateTime @default(now())
+
+  @@index([messageId])
+}
+
+// ──────────────────────────────────────────────────────────────
+// LEADS & CRM
+// ──────────────────────────────────────────────────────────────
+
+model Lead {
+  id          String   @id @default(uuid()) @db.Uuid
+  businessId  String?  @db.Uuid
+  business    Business? @relation(fields: [businessId], references: [id])
+  providerId  String?  @db.Uuid
+  provider    ProviderProfile? @relation(fields: [providerId], references: [id])
+  requestId   String?  @db.Uuid
+  request     CustomerRequest? @relation(fields: [requestId], references: [id])
+  customerId  String   @db.Uuid
+  customerName String?
+  stage       LeadStage @default(NEW)
+  source      String?
+  assignedToId String? @db.Uuid
+  assignedTo  User?    @relation("LeadAssignedTo", fields: [assignedToId], references: [id])
+  followUpDate DateTime?
+  lossReason  String?
+  outcome     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  assignments LeadAssignment[]
+  notes       LeadNote[]
+
+  @@index([businessId])
+  @@index([providerId])
+  @@index([stage])
+  @@index([assignedToId])
+}
+
+enum LeadStage {
+  NEW
+  CONTACTED
+  QUALIFIED
+  QUOTE_IN_PROGRESS
+  QUOTE_SENT
+  NEGOTIATING
+  WON
+  LOST
+  SPAM
+}
+
+model LeadAssignment {
+  id          String   @id @default(uuid()) @db.Uuid
+  leadId      String   @db.Uuid
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  assignedToId String  @db.Uuid
+  assignedAt  DateTime @default(now())
+
+  @@index([leadId])
+}
+
+model LeadNote {
+  id          String   @id @default(uuid()) @db.Uuid
+  leadId      String   @db.Uuid
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  authorId    String   @db.Uuid
+  author      User     @relation(fields: [authorId], references: [id])
+  note        String
+  createdAt   DateTime @default(now())
+
+  @@index([leadId])
+}
+
+// ──────────────────────────────────────────────────────────────
+// REVIEWS & REPUTATION
+// ──────────────────────────────────────────────────────────────
+
+model ReviewEligibility {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @db.Uuid
+  businessId    String?  @db.Uuid
+  providerId    String?  @db.Uuid
+  workRecordId  String?  @db.Uuid
+  quoteId       String?  @db.Uuid
+  eligibilityType String  // verified_interaction, confirmed_quote, business_confirmed, evidence_reviewed, general_public
+  token         String?  @unique  // single-use review token
+  isUsed        Boolean  @default(false)
+  expiresAt     DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+  @@index([businessId])
+  @@index([providerId])
+}
+
+model Review {
+  id              String   @id @default(uuid()) @db.Uuid
+  authorId        String   @db.Uuid
+  author          User     @relation("ReviewAuthor", fields: [authorId], references: [id])
+  businessId      String?  @db.Uuid
+  business        Business? @relation("ReviewBusiness", fields: [businessId], references: [id])
+  providerId      String?  @db.Uuid
+  provider        ProviderProfile? @relation("ReviewProvider", fields: [providerId], references: [id])
+  workRecordId    String?  @db.Uuid
+  workRecord      WorkRecord? @relation(fields: [workRecordId], references: [id])
+  eligibilityType String
+  overallRating   Int      // 1-5
+  qualityRating   Int?
+  customerServiceRating Int?
+  valueRating     Int?
+  reliabilityRating Int?
+  communicationRating Int?
+  timelinessRating Int?
+  title           String?
+  body            String?
+  dateOfExperience DateTime?
+  branchId        String?  @db.Uuid
+  serviceInvolved String?
+  images          String[] @default([])
+  wouldRecommend  Boolean?
+  status          ReviewStatus @default(PUBLISHED)
+  isFlagged       Boolean  @default(false)
+  fraudRiskScore  Float?   @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  dimensions      ReviewDimension[]
+  responses       ReviewResponse[]
+  flags           ReviewFlag[]
+  moderationDecision ReviewModerationDecision?
+
+  @@index([authorId])
+  @@index([businessId])
+  @@index([providerId])
+  @@index([status])
+  @@index([workRecordId])
+}
+
+enum ReviewStatus {
+  PUBLISHED
+  HIDDEN
+  REMOVED
+  PENDING_MODERATION
+}
+
+model ReviewDimension {
+  id          String   @id @default(uuid()) @db.Uuid
+  reviewId    String   @db.Uuid
+  review      Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  dimension   String
+  rating      Int
+  createdAt   DateTime @default(now())
+
+  @@index([reviewId])
+}
+
+model ReviewResponse {
+  id          String   @id @default(uuid()) @db.Uuid
+  reviewId    String   @db.Uuid
+  review      Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  authorId    String   @db.Uuid
+  author      User     @relation(fields: [authorId], references: [id])
+  body        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([reviewId])
+}
+
+model ReviewFlag {
+  id          String   @id @default(uuid()) @db.Uuid
+  reviewId    String   @db.Uuid
+  review      Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  flagReason  String   // duplicate, self_review, employee_review, competitor_attack, review_bombing, purchased, incentivised, threat, ai_spam
+  flaggedBy   String?  @db.Uuid
+  riskScore   Float    @default(0)
+  details     String?
+  status      String   @default("PENDING") // PENDING, REVIEWED, DISMISSED, ACTIONED
+  createdAt   DateTime @default(now())
+
+  @@index([reviewId])
+  @@index([status])
+}
+
+model ReviewModerationDecision {
+  id          String   @id @default(uuid()) @db.Uuid
+  reviewId    String   @unique @db.Uuid
+  review      Review   @relation(fields: [reviewId], references: [id])
+  decision    String   // keep, hide, remove, request_clarification
+  reason      String?
+  moderatorId String   @db.Uuid
+  moderationCaseId String? @db.Uuid
+  decidedAt   DateTime @default(now())
+  appealStatus String? // none, pending, approved, rejected
+
+  @@index([reviewId])
+}
+
+// ──────────────────────────────────────────────────────────────
+// FAVOURITES, FOLLOWS, SAVED SEARCHES
+// ──────────────────────────────────────────────────────────────
+
+model Favourite {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessId  String?  @db.Uuid
+  business    Business? @relation(fields: [businessId], references: [id])
+  serviceId   String?  @db.Uuid
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, businessId, serviceId])
+  @@index([userId])
+}
+
+model Follow {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessId  String?  @db.Uuid
+  business    Business? @relation(fields: [businessId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, businessId])
+  @@index([userId])
+}
+
+model SavedSearch {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  query       String?
+  categoryId  String?  @db.Uuid
+  locationId  String?  @db.Uuid
+  filters     Json?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ──────────────────────────────────────────────────────────────
+// REPORTS & MODERATION
+// ──────────────────────────────────────────────────────────────
+
+model Report {
+  id          String   @id @default(uuid()) @db.Uuid
+  reporterId  String   @db.Uuid
+  reporter    User     @relation("ReportReporter", fields: [reporterId], references: [id])
+  targetType  String   // business, provider, service, product, message, review, quote, verification_claim
+  targetId    String   @db.Uuid
+  businessId  String?  @db.Uuid
+  business    Business? @relation("ReportBusiness", fields: [businessId], references: [id])
+  reason      String
+  description String?
+  status      String   @default("PENDING") // PENDING, REVIEWING, RESOLVED, DISMISSED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  moderationCaseId String? @db.Uuid
+
+  @@index([targetType, targetId])
+  @@index([status])
+  @@index([reporterId])
+}
+
+model ModerationCase {
+  id          String   @id @default(uuid()) @db.Uuid
+  reportId    String?  @db.Uuid
+  targetType  String
+  targetId    String   @db.Uuid
+  policyReason String?
+  status      String   @default("OPEN") // OPEN, IN_REVIEW, RESOLVED, ESCALATED
+  priority    String   @default("NORMAL")
+  assignedToId String? @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  actions     ModerationAction[]
+  disputes    Dispute[]
+
+  @@index([status])
+  @@index([targetType, targetId])
+}
+
+model ModerationAction {
+  id          String   @id @default(uuid()) @db.Uuid
+  caseId      String?  @db.Uuid
+  case        ModerationCase? @relation(fields: [caseId], references: [id])
+  actorId     String   @db.Uuid
+  actor       User     @relation(fields: [actorId], references: [id])
+  action      String   // warning, suspend, remove_content, ban, request_clarification, escalate
+  reason      String?
+  evidence    String?
+  outcome     String?
+  appealStatus String? // none, pending, approved, rejected
+  createdAt   DateTime @default(now())
+
+  @@index([caseId])
+  @@index([actorId])
+}
+
+model Dispute {
+  id          String   @id @default(uuid()) @db.Uuid
+  moderationCaseId String? @db.Uuid
+  moderationCase ModerationCase? @relation(fields: [moderationCaseId], references: [id])
+  workRecordId String?  @db.Uuid
+  filedById    String   @db.Uuid
+  filedAgainstId String @db.Uuid
+  description  String?
+  evidence     Json?
+  status       String   @default("OPEN") // OPEN, UNDER_REVIEW, RESOLVED, CLOSED
+  resolution   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([moderationCaseId])
+  @@index([workRecordId])
+  @@index([status])
+}
+
+// ──────────────────────────────────────────────────────────────
+// SUBSCRIPTIONS & BILLING
+// ──────────────────────────────────────────────────────────────
+
+model SubscriptionPlan {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique
+  description String?
+  priceMonthly Decimal @db.Decimal(10, 2)
+  priceAnnual Decimal? @db.Decimal(10, 2)
+  currency    String   @default("USD")
+  features     Json?
+  isActive    Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  subscriptions Subscription[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Subscription {
+  id          String   @id @default(uuid()) @db.Uuid
+  businessId  String?  @unique @db.Uuid
+  business    Business? @relation(fields: [businessId], references: [id])
+  planId      String   @db.Uuid
+  plan        SubscriptionPlan @relation(fields: [planId], references: [id])
+  status      String   @default("ACTIVE") // ACTIVE, PAST_DUE, CANCELLED, EXPIRED, GRACE_PERIOD
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  invoices    Invoice[]
+
+  @@index([businessId])
+  @@index([status])
+}
+
+model Invoice {
+  id              String   @id @default(uuid()) @db.Uuid
+  subscriptionId  String?  @db.Uuid
+  subscription    Subscription? @relation(fields: [subscriptionId], references: [id])
+  businessId      String?  @db.Uuid
+  invoiceNumber   String   @unique
+  amount          Decimal  @db.Decimal(12, 2)
+  currency        String   @default("USD")
+  status          String   @default("PENDING") // PENDING, PAID, FAILED, CANCELLED, REFUNDED
+  dueDate         DateTime?
+  paidAt          DateTime?
+  createdAt       DateTime @default(now())
+
+  payments        Payment[]
+  refunds         Refund[]
+
+  @@index([subscriptionId])
+  @@index([status])
+}
+
+model Payment {
+  id              String   @id @default(uuid()) @db.Uuid
+  invoiceId       String?  @db.Uuid
+  invoice         Invoice? @relation(fields: [invoiceId], references: [id])
+  userId          String?  @db.Uuid
+  user            User?    @relation(fields: [userId], references: [id])
+  amount          Decimal  @db.Decimal(12, 2)
+  currency        String   @default("USD")
+  provider        String?  // ecocash, onemoney, innbucks, visa, mastercard, bank_transfer
+  providerRef     String?
+  status          String   @default("PENDING") // PENDING, SUCCESS, FAILED, CANCELLED
+  method          String?
+  idempotencyKey  String?  @unique
+  webhookSignature String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  refunds         Refund[]
+
+  @@index([invoiceId])
+  @@index([status])
+  @@index([idempotencyKey])
+}
+
+model Refund {
+  id          String   @id @default(uuid()) @db.Uuid
+  paymentId   String   @db.Uuid
+  payment     Payment  @relation(fields: [paymentId], references: [id])
+  invoiceId   String?  @db.Uuid
+  invoice     Invoice? @relation(fields: [invoiceId], references: [id])
+  amount      Decimal  @db.Decimal(12, 2)
+  currency    String   @default("USD")
+  status      String   @default("PENDING") // PENDING, APPROVED, PROCESSED, REJECTED
+  reason      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([paymentId])
+  @@index([status])
+}
+
+// ──────────────────────────────────────────────────────────────
+// ADVERTISING & CAMPAIGNS
+// ──────────────────────────────────────────────────────────────
+
+model Campaign {
+  id          String   @id @default(uuid()) @db.Uuid
+  businessId  String   @db.Uuid
+  business    Business @relation(fields: [businessId], references: [id])
+  name        String
+  type        String   // sponsored_search, featured_category, featured_location, homepage, promoted_service, promoted_business, newsletter, banner
+  startDate   DateTime
+  endDate     DateTime?
+  budget      Decimal? @db.Decimal(10, 2)
+  spent       Decimal  @default(0) @db.Decimal(10, 2)
+  currency    String   @default("USD")
+  status      String   @default("DRAFT") // DRAFT, ACTIVE, PAUSED, COMPLETED, CANCELLED
+  targeting   Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  metrics     CampaignMetric[]
+
+  @@index([businessId])
+  @@index([status])
+}
+
+model CampaignMetric {
+  id          String   @id @default(uuid()) @db.Uuid
+  campaignId  String   @db.Uuid
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  date        DateTime @db.Date
+  impressions Int      @default(0)
+  uniqueReach Int      @default(0)
+  profileVisits Int    @default(0)
+  serviceViews Int     @default(0)
+  saves       Int      @default(0)
+  calls       Int      @default(0)
+  whatsappClicks Int   @default(0)
+  messages    Int      @default(0)
+  quoteRequests Int    @default(0)
+  qualifiedLeads Int   @default(0)
+  costPerResult Decimal? @db.Decimal(10, 4)
+  createdAt   DateTime @default(now())
+
+  @@unique([campaignId, date])
+  @@index([campaignId])
+}
+
+// ──────────────────────────────────────────────────────────────
+// NOTIFICATIONS
+// ──────────────────────────────────────────────────────────────
+
+model Notification {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   // new_request, new_message, quote_received, quote_viewed, quote_accepted, quote_declined, verification_update, verification_expiry, reconfirmation_due, new_review, review_response, report_outcome, payment_result, subscription_renewal, suspicious_login
+  title       String
+  body        String?
+  link        String?
+  isRead      Boolean  @default(false)
+  isEssential Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model NotificationPreference {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @unique @db.Uuid
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inApp       Boolean  @default(true)
+  email       Boolean  @default(true)
+  sms         Boolean  @default(false)
+  push        Boolean  @default(false)
+  whatsapp    Boolean  @default(false)
+  quietHoursStart String?
+  quietHoursEnd   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ──────────────────────────────────────────────────────────────
+// SUPPORT TICKETS
+// ──────────────────────────────────────────────────────────────
+
+model SupportTicket {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  user        User     @relation("SupportTicketUser", fields: [userId], references: [id])
+  subject     String
+  description String?
+  status      String   @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, CLOSED
+  priority    String   @default("NORMAL")
+  assignedToId String? @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+// ──────────────────────────────────────────────────────────────
+// PRIVACY, CONSENT, AUDIT
+// ──────────────────────────────────────────────────────────────
+
+model ConsentRecord {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String?  @db.Uuid
+  user        User?    @relation(fields: [userId], references: [id])
+  purpose     String
+  granted     Boolean
+  version     String?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actorId     String?  @db.Uuid
+  actor       User?    @relation("AuditActor", fields: [actorId], references: [id])
+  action      String
+  targetType  String?
+  targetId    String?  @db.Uuid
+  caseId      String?  @db.Uuid
+  case        VerificationCase? @relation(fields: [caseId], references: [id])
+  details     Json?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
+
+model FeatureFlag {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique
+  description String?
+  isEnabled   Boolean  @default(false)
+  rolloutPct  Int      @default(0)
+  config      Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model DataExportRequest {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  user        User     @relation(fields: [userId], references: [id])
+  status      String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  downloadUrl String?
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+model AccountDeletionRequest {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  user        User     @relation(fields: [userId], references: [id])
+  status      String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, CANCELLED
+  scheduledAt DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
