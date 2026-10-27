@@ -243,7 +243,7 @@ export default async function SearchPage({
                           <div className="flex flex-wrap items-center gap-4 mt-3">
                             <RatingStars
                               rating={biz.averageRating}
-                              count={biz._count.reviews}
+                              count={biz.reviewCount || biz._count.reviews}
                               size="sm"
                             />
                             {biz.address?.location && (

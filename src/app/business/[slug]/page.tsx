@@ -89,7 +89,17 @@ export default async function BusinessProfilePage({
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* Business Header */}
-          <Card>
+          <Card className="overflow-hidden">
+            {business.coverImageUrl && (
+              <div className="h-40 w-full overflow-hidden bg-[#F1F5F4] sm:h-52">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={business.coverImageUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            )}
             <CardContent className="p-6">
               <div className="flex items-start gap-4">
                 {business.logoUrl ? (
@@ -133,7 +143,7 @@ export default async function BusinessProfilePage({
                   <div className="flex flex-wrap items-center gap-4 mt-4">
                     <RatingStars
                       rating={business.averageRating}
-                      count={business._count.reviews}
+                      count={business.reviewCount || business._count.reviews}
                       size="md"
                     />
                     <FreshnessIndicator
@@ -277,7 +287,7 @@ export default async function BusinessProfilePage({
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Customer Reviews</CardTitle>
-                <Badge variant="neutral">{business._count.reviews} total</Badge>
+                <Badge variant="neutral">{business.reviewCount || business._count.reviews} total</Badge>
               </div>
             </CardHeader>
             <CardContent>

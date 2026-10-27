@@ -247,6 +247,16 @@ async function main() {
   const allCats = await prisma.category.findMany();
   const catId = Object.fromEntries(allCats.map((c) => [c.slug, c.id]));
   const locId = Object.fromEntries(locations.map((l) => [l.name, l.id]));
+  const streetByLoc: Record<string, string> = {
+    Harare: "12 Samora Machel Avenue",
+    Bulawayo: "14 Fife Street",
+    Mutare: "7 Herbert Chitepo Street",
+    Gweru: "11 Robert Mugabe Way",
+    Kwekwe: "5 Nelson Mandela Way",
+    Masvingo: "18 Simon Mazorodze Road",
+    Chitungwiza: "3 Town Centre",
+    Marondera: "9 The Green",
+  };
 
   type DemoBiz = {
     name: string;
@@ -641,10 +651,11 @@ async function main() {
 
     const owner = await createUser(ownerEmail, whatsapp, ownerName, "BUSINESS_OWNER");
 
+    const street = streetByLoc[loc] ?? "123 Main Street";
     const address = locId[loc]
       ? await prisma.address.create({
           data: {
-            line1: "TBD",
+            line1: street,
             locationId: locId[loc],
           },
         })
@@ -671,11 +682,18 @@ async function main() {
           profileFreshness: freshness ?? FreshnessLabel.RECONFIRMED_THIS_MONTH,
         },
       });
-    } else if (!existing.coverImageUrl) {
-      await prisma.business.update({
-        where: { id: existing.id },
-        data: { coverImageUrl: `/images/${img}.jpg` },
-      });
+    } else {
+      if (!existing.coverImageUrl) {
+        await prisma.business.update({
+          where: { id: existing.id },
+          data: { coverImageUrl: `/images/${img}.jpg` },
+        });
+      }
+      if (existing.addressId) {
+        await prisma.address
+          .update({ where: { id: existing.addressId }, data: { line1: street } })
+          .catch(() => {});
+      }
     }
   }
   console.log("✓ Demo businesses created");
