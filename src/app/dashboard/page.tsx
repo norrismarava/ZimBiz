@@ -46,9 +46,30 @@ export default async function DashboardPage() {
 
   const hasBusiness = businesses.length > 0;
   const hasProvider = !!providerProfile;
+  const isAdmin = user.userRoles.some(
+    (ur: { role: { name: string } }) => ur.role.name === "ADMIN"
+  );
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+      {isAdmin && (
+        <Link href="/admin/revenue">
+          <Card className="mb-6 border-[#047857]/30 bg-[#047857]/5 hover:shadow-md transition-all cursor-pointer">
+            <CardContent className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-3">
+                <LayoutDashboard className="h-5 w-5 text-[#047857]" aria-hidden="true" />
+                <div>
+                  <p className="font-semibold text-[#064E3B]">Platform Admin</p>
+                  <p className="text-xs text-[#047857]">
+                    Revenue console — plans, subscriptions, invoices
+                  </p>
+                </div>
+              </div>
+              <ArrowRight className="h-5 w-5 text-[#047857]" aria-hidden="true" />
+            </CardContent>
+          </Card>
+        </Link>
+      )}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-[#111827]">
           Welcome back, {user.name?.split(" ")[0] || "there"}

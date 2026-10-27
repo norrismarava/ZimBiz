@@ -243,6 +243,64 @@ async function main() {
   await createUser("customer@zimbiz.co.zw", "+263 77 999 8888", "Nyasha Customer", "CUSTOMER");
   console.log("✓ Admin, officer and customer users created");
 
+  // ── Subscription Plans ──
+  const plans = [
+    {
+      name: "Free",
+      description: "Get listed and start receiving requests",
+      priceMonthly: 0,
+      priceAnnual: 0,
+      currency: "USD",
+      sortOrder: 0,
+      features: [
+        "Business listing with contact details",
+        "Respond to customer requests",
+        "Collect verified reviews",
+        "Basic profile freshness tracking",
+      ],
+    },
+    {
+      name: "Business Pro",
+      description: "For providers who want to grow faster",
+      priceMonthly: 15,
+      priceAnnual: 150,
+      currency: "USD",
+      sortOrder: 1,
+      features: [
+        "Everything in Free",
+        "Priority placement in search results",
+        "Verified badge fast-track",
+        "Unlimited quotes per month",
+        "Portfolio gallery (up to 20 photos)",
+        "View customer phone numbers directly",
+      ],
+    },
+    {
+      name: "Enterprise",
+      description: "For multi-branch businesses and agencies",
+      priceMonthly: 45,
+      priceAnnual: 450,
+      currency: "USD",
+      sortOrder: 2,
+      features: [
+        "Everything in Business Pro",
+        "Up to 5 branches under one account",
+        "Team seats for staff",
+        "Featured category placement",
+        "Analytics dashboard",
+        "Priority support",
+      ],
+    },
+  ];
+
+  for (const plan of plans) {
+    const existing = await prisma.subscriptionPlan.findUnique({ where: { name: plan.name } });
+    if (!existing) {
+      await prisma.subscriptionPlan.create({ data: plan });
+    }
+  }
+  console.log("✓ Subscription plans created");
+
   // ── Demo Businesses ──
   const allCats = await prisma.category.findMany();
   const catId = Object.fromEntries(allCats.map((c) => [c.slug, c.id]));
@@ -697,6 +755,49 @@ async function main() {
     }
   }
   console.log("✓ Demo businesses created");
+  // ── Demo Subscriptions ──
+  const proPlan = await prisma.subscriptionPlan.findUnique({ where: { name: "Business Pro" } });
+  const entPlan = await prisma.subscriptionPlan.findUnique({ where: { name: "Enterprise" } });
+  const now = new Date();
+  const periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const subsToCreate = [
+    { slug: "elegant-events-zim", plan: proPlan },
+    { slug: "sunshine-solar-solutions", plan: entPlan },
+  ];
+  let invSeq = 0;
+  for (const { slug, plan } of subsToCreate) {
+    if (!plan) continue;
+    const biz = await prisma.business.findUnique({ where: { slug } });
+    if (!biz) continue;
+    const sub = await prisma.subscription.upsert({
+      where: { businessId: biz.id },
+      update: {},
+      create: {
+        businessId: biz.id,
+        planId: plan.id,
+        status: "ACTIVE",
+        currentPeriodStart: now,
+        currentPeriodEnd: periodEnd,
+      },
+    });
+    const invoiceNumber = `INV-2026-${String(++invSeq).padStart(4, "0")}`;
+    const hasInvoice = await prisma.invoice.findUnique({ where: { invoiceNumber } });
+    if (!hasInvoice) {
+      await prisma.invoice.create({
+        data: {
+          subscriptionId: sub.id,
+          businessId: biz.id,
+          invoiceNumber,
+          amount: plan.priceMonthly,
+          currency: "USD",
+          status: "PAID",
+          paidAt: now,
+        },
+      });
+    }
+  }
+  console.log("✓ Demo subscriptions created");
+
   console.log("🌱 Seed complete!");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("Demo accounts (password: Password123):");
