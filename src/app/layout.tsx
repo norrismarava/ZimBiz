@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
+import { PagePreloader } from "@/components/layout/page-preloader";
 import { getCurrentUser } from "@/lib/auth";
 
 const inter = Inter({
@@ -33,6 +34,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-[#F8FAF9]">
+        <PagePreloader />
         <Header userName={user?.name} />
         <main className="flex-1">{children}</main>
         <Footer />
