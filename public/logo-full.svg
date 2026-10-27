@@ -1,17 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 48" fill="none">
-  <defs>
-    <linearGradient id="zb-bg" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#059669"/>
-      <stop offset="1" stop-color="#064E3B"/>
-    </linearGradient>
-  </defs>
-  <rect width="48" height="48" rx="12" fill="url(#zb-bg)"/>
-  <path d="M15.5 15.5H32.5L15.5 32.5H32.5" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="15.5" cy="15.5" r="3.25" fill="white"/>
-  <circle cx="32.5" cy="15.5" r="3.25" fill="white"/>
-  <circle cx="15.5" cy="32.5" r="3.25" fill="white"/>
-  <circle cx="32.5" cy="32.5" r="4" fill="#D4A017"/>
-  <text x="58" y="22" font-family="Inter, system-ui, sans-serif" font-size="18" font-weight="800" fill="#064E3B">ZimBiz</text>
-  <text x="58" y="39" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700" fill="#D4A017" letter-spacing="2.5">CONNECT</text>
-  <text x="130" y="39" font-family="Inter, system-ui, sans-serif" font-size="9" font-weight="500" fill="#64748B">Discover · Verify · Connect</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 560" fill="none">
+  <!-- rising bars: gold / red / emerald (Zim flag trio) -->
+  <rect x="168" y="212" width="38" height="122" rx="6" fill="#D4A017"/>
+  <rect x="221" y="176" width="38" height="158" rx="6" fill="#DC2626"/>
+  <rect x="274" y="134" width="38" height="200" rx="6" fill="#047857"/>
+  <!-- open circular arc -->
+  <path d="M126 141A150 150 0 1 0 356 330" stroke="#3F3F46" stroke-width="14" stroke-linecap="round" fill="none"/>
+  <!-- zigzag trend line with nodes, exiting the arc -->
+  <path d="M76 322 142 289 191 319 246 294 301 320 356 281 396 229" stroke="#3F3F46" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <circle cx="76" cy="322" r="10" fill="#3F3F46"/>
+  <circle cx="142" cy="289" r="10" fill="#3F3F46"/>
+  <circle cx="191" cy="319" r="10" fill="#3F3F46"/>
+  <circle cx="246" cy="294" r="10" fill="#3F3F46"/>
+  <circle cx="301" cy="320" r="10" fill="#3F3F46"/>
+  <circle cx="356" cy="281" r="10" fill="#3F3F46"/>
+  <circle cx="396" cy="229" r="11" fill="#D4A017" stroke="#3F3F46" stroke-width="5"/>
+  <!-- wordmark -->
+  <text x="240" y="478" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="72" font-weight="900" font-style="italic" fill="#3F3F46" letter-spacing="-2">Zim<tspan fill="#047857">Biz</tspan></text>
+  <text x="240" y="522" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="21" font-weight="700" fill="#D4A017" letter-spacing="3">DISCOVER · VERIFY · CONNECT</text>
 </svg>

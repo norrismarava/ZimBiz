@@ -3,7 +3,7 @@
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ShieldCheck, Building2, User, Wrench, Eye, EyeOff } from "lucide-react";
+import { Building2, User, Wrench, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input, Label, Field } from "@/components/ui/input";
@@ -68,9 +68,8 @@ function RegisterForm() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#047857]">
-              <ShieldCheck className="h-6 w-6 text-white" aria-hidden="true" />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-full.svg" alt="ZimBiz Connect" className="h-28 w-auto" />
           </Link>
           <h1 className="mt-4 text-2xl font-bold text-[#111827]">Create your account</h1>
           <p className="mt-1 text-sm text-[#64748B]">
